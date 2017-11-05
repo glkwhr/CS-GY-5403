@@ -76,12 +76,46 @@ class GreedyAgent(Agent):
 class HillClimberAgent(Agent):
     # Initialization Function: Called one time when the game starts
     def registerInitialState(self, state):
+        self.actionList = [];
+        for i in range(0, 5):
+            self.actionList.append(Directions.STOP);
         return;
 
     # GetAction Function: Called with every frame
     def getAction(self, state):
-        # TODO: write Hill Climber Algorithm instead of returning Directions.STOP
-        return Directions.STOP
+        possible = state.getAllPossibleActions();
+        for i in range(0,len(self.actionList)):
+            self.actionList[i] = possible[random.randint(0,len(possible)-1)];
+        maxScore = 0
+        maxActionList = list(self.actionList)
+        tempState = state
+        isTerminal = False            
+        while True:
+            tempState = state
+            tempScore = 0
+            for i in range(0,len(self.actionList)):
+                tempScore = scoreEvaluation(tempState)
+                if tempState.isWin() + tempState.isLose() == 0:
+                    tempState = tempState.generatePacmanSuccessor(self.actionList[i])
+                    if not tempState:
+                        # generatePacmanSuccessor has been called maximum times
+                        break
+                else:
+                    break               
+            if tempScore > maxScore:
+                maxScore = tempScore
+                maxActionList = list(self.actionList)
+            if not tempState:
+                # generatePacmanSuccessor has been called maximum times
+                break
+            self.changeActionList(tempState)
+        return maxActionList[0]
+        
+    def changeActionList(self, state):
+        possible = state.getAllPossibleActions()
+        for i in range(0,len(self.actionList)):
+            if (random.randint(0, 9) < 5):
+                self.actionList[i] = possible[random.randint(0,len(possible)-1)]
 
 class GeneticAgent(Agent):
     # Initialization Function: Called one time when the game starts
