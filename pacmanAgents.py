@@ -76,23 +76,22 @@ class GreedyAgent(Agent):
 class HillClimberAgent(Agent):
     # Initialization Function: Called one time when the game starts
     def registerInitialState(self, state):
-        self.actionList = [];
+        self.actionList = []
         for i in range(0, 5):
-            self.actionList.append(Directions.STOP);
-        return;
+            self.actionList.append(Directions.STOP)
+        return
 
     # GetAction Function: Called with every frame
     def getAction(self, state):
-        possible = state.getAllPossibleActions();
+        possible = state.getAllPossibleActions()
         for i in range(0,len(self.actionList)):
-            self.actionList[i] = possible[random.randint(0,len(possible)-1)];
-        maxScore = 0
-        maxActionList = list(self.actionList)
-        tempState = state
-        isTerminal = False            
+            self.actionList[i] = possible[random.randint(0,len(possible)-1)]
+        maxScore = -2147483648
+        maxActionList = self.actionList[:]
+        tempState = state          
         while True:
             tempState = state
-            tempScore = 0
+            tempScore = -2147483648
             for i in range(0,len(self.actionList)):
                 tempScore = scoreEvaluation(tempState)
                 if tempState.isWin() + tempState.isLose() == 0:
@@ -104,7 +103,7 @@ class HillClimberAgent(Agent):
                     break               
             if tempScore > maxScore:
                 maxScore = tempScore
-                maxActionList = list(self.actionList)
+                maxActionList = self.actionList[:]
             if not tempState:
                 # generatePacmanSuccessor has been called maximum times
                 break
@@ -120,12 +119,95 @@ class HillClimberAgent(Agent):
 class GeneticAgent(Agent):
     # Initialization Function: Called one time when the game starts
     def registerInitialState(self, state):
-        return;
+        defaultChromosome = []
+        for i in range(0, 5):
+            defaultChromosome.append(Directions.STOP)
+        self.chromosomes = []
+        for i in range(0, 8):
+            self.chromosomes.append(defaultChromosome[:])
+        return
+    
+    # Using rank selection
+    def selectIndex(self):
+        if not len(self.fitness):
+            return None
+        sum = 0
+        value = random.randint(0, 35)
+        for i in range(0, 8):
+            sum += i + 1
+            if value < sum:
+                return self.fitness[i][0]
+        return None
+    
+    def computeFitness(self, state):
+        scoresMap = {}
+        for i in range(0, len(self.chromosomes)):
+            tempState = state
+            tempScore = -2147483648
+            for j in range(0,len(self.chromosomes[i])):
+                tempScore = scoreEvaluation(tempState)
+                if tempState.isWin() + tempState.isLose() == 0:
+                    tempState = tempState.generatePacmanSuccessor(self.chromosomes[i][j])
+                    if tempState is None:
+                        # generatePacmanSuccessor has been called maximum times
+                        return False
+                else:
+                    break
+            scoresMap.update({i: tempScore})
+        self.fitness = sorted(scoresMap.items(), key = lambda x: x[1])[:]
+        return True
+    
+    def generateChildren(self, indexA, indexB, nextGeneration):
+        if random.randint(0, 9) < 7:
+            # Crossover (70%)
+            for i in range(0, 2):
+                # 2 children
+                child = []
+                for j in range(0, len(self.chromosomes[indexA])):
+                    if random.randint(0, 1) < 1:
+                        child.append(self.chromosomes[indexA][j])
+                    else:
+                        child.append(self.chromosomes[indexB][j])
+                nextGeneration.append(child[:])
+        else:
+            # Keep the pair (30%)
+            nextGeneration.append(self.chromosomes[indexA][:])
+            nextGeneration.append(self.chromosomes[indexB][:])
 
     # GetAction Function: Called with every frame
     def getAction(self, state):
-        # TODO: write Genetic Algorithm instead of returning Directions.STOP
-        return Directions.STOP
+        # Initialize population
+        possible = state.getAllPossibleActions()
+        for i in range(0, 8):
+            tempChromosome = []
+            for j in range(0, 5):
+                tempChromosome.append(possible[random.randint(0,len(possible)-1)])
+            self.chromosomes[i] = tempChromosome[:]
+        # Start evolution
+        nextGeneration = self.chromosomes[:]
+        while self.computeFitness(state) is True:
+            # Replace population
+            self.chromosomes = nextGeneration[:]
+            nextGeneration = []
+            # Generate next generation
+            while len(nextGeneration) < len(self.chromosomes):
+                # Select parents
+                parentAIndex = self.selectIndex()
+                parentBIndex = self.selectIndex()
+                #while parentBIndex == parentAIndex:
+                #    parentBIndex = self.selectIndex()
+                # Generate children
+                self.generateChildren(parentAIndex, parentBIndex, nextGeneration)
+            # Mutate
+            for i in range(0, len(nextGeneration)):
+                if random.randint(0, 9) < 1:
+                    # Mutate this chromosome
+                    nextGeneration[i][random.randint(0,len(nextGeneration[i])-1)] = possible[random.randint(0,len(possible)-1)]
+        #survivor = self.selectIndex()
+        survivor = self.fitness[len(self.fitness)-1][0]
+        #print self.fitness
+        #print survivor
+        return self.chromosomes[survivor][0]
 
 class MCTSAgent(Agent):
     # Initialization Function: Called one time when the game starts
