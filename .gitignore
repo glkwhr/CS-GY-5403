@@ -1,4 +1,5 @@
 *.pyc
+*.pdf
 .DS_Store
 layout
 os
