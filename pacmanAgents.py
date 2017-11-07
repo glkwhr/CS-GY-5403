@@ -210,11 +210,93 @@ class GeneticAgent(Agent):
         return self.chromosomes[survivor][0]
 
 class MCTSAgent(Agent):
+    # Monte Carlo Tree node
+    class Node(object):
+        def __init__(self):
+            self.parent = None
+            self.children = []
+            #self.terminal = False
+            #self.fullyExpanded = False
+            self.counter = 0
+            self.rewardSum = 0
+            self.action = None # parent =action=> this node
+            self.triedActions = set([])
+
     # Initialization Function: Called one time when the game starts
     def registerInitialState(self, state):
         return;
+    
+    def treePolicy(self, v):
+        while v[1].isWin() + v[1].isLose() == 0:
+            if (set(v[1].getLegalPacmanActions()) - v[0].triedActions):
+                return self.expand(v)
+            else:
+                node = self.select(v)
+                v = (node, v[1].generatePacmanSuccessor(node.action))
+                if v[1] is None:
+                    return None
+        return v
+    
+    def expand(self, v):
+        # Choose a untried action
+        legalActions = v[1].getLegalPacmanActions()
+        candidateActions = [x for x in (set(legalActions) - v[0].triedActions)]
+        if not candidateActions:
+            v[0].fullyExpanded = True
+            return v
+        else:
+            a = candidateActions[random.randint(0, len(candidateActions)-1)]
+            v[0].triedActions.add(a)
+            if len(v[0].triedActions) == len(legalActions):
+                v[0].fullyExpanded = True
+        # Add a new child
+        child = self.Node()
+        child.parent = v[0]
+        child.action = a
+        childState = v[1].generatePacmanSuccessor(a)
+        if childState is None:
+            #self.over = True
+            return None
+        v[0].children.append(child)
+        return (child, childState)
+    
+    def select(self, v):
+        if v[1].isWin() + v[1].isLose() != 0:
+            print 1
+            return v[0]
+        v[0].children.sort(key = lambda child: (child.rewardSum / child.counter + math.sqrt(2 * math.log(child.parent.counter) / child.counter)))
+        return v[0].children[-1]
+    
+    def defaultPolicy(self, state):
+        counter = 5
+        s = state
+        while counter > 0 and (s.isWin() + s.isLose() == 0):
+            legalActions = s.getLegalPacmanActions()
+            a = legalActions[random.randint(0, len(legalActions)-1)]
+            s = s.generatePacmanSuccessor(a)
+            if s is None:
+                return None
+            counter -= 1
+        return normalizedScoreEvaluation(self.rootState, s)
+    
+    def backUp(self, node, reward):
+        while node is not None:
+            node.counter += 1
+            node.rewardSum += reward
+            node = node.parent
 
     # GetAction Function: Called with every frame
     def getAction(self, state):
-        # TODO: write MCTS Algorithm instead of returning Directions.STOP
-        return Directions.STOP
+        #self.over = False
+        self.rootState = state
+        # Create root node
+        root = self.Node()
+        while True:
+            v1 = self.treePolicy((root, state))
+            if v1 is not None:
+                reward = self.defaultPolicy(v1[1])
+                if reward is not None:
+                    self.backUp(v1[0], reward)
+                    continue
+            break
+        return self.select((root, state)).action
